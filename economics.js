@@ -314,7 +314,15 @@ let getToolTipMsg = function (d) {
                     Customers: ${vendor.numCustomers.length} <br>
                     Transactions: ${numberWithCommas(vendor.numTransactions)}`;
         } else if (d.depth == 1) {
-            return `Amount: ${numberWithCommas(Math.round(d.value * 100) / 100)}`;
+            let totalTransactions = 0;
+            let totalCustomers = 0;
+            Object.entries(businessDetails[currentMonth][d.data.business]).forEach(function(d) {
+                totalTransactions += d[1].numTransactions;
+                totalCustomers += d[1].numCustomers.length;
+            })
+            return `Amount: ${numberWithCommas(Math.round(d.value * 100) / 100)} <br>
+            Customers: ${totalCustomers} <br>
+            Transactions: ${numberWithCommas(totalTransactions)}`;
         }
     }
 }
