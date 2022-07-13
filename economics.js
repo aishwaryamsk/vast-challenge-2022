@@ -200,7 +200,7 @@ let packBusiness = d3.pack().padding(function (d) {
 
 let financeHeight = Math.min(window.innerHeight, window.innerWidth);
 let width;
-let businessHeight = 1.3 * financeHeight;
+let businessHeight = 1.2 * financeHeight;
 let financeSvg;
 let nodeHeirarchyFinance;
 let rootFinanace;
