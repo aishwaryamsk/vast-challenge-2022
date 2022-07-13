@@ -1,0 +1,85 @@
+.links line {
+    stroke: #999;
+    stroke-opacity: 0.6;
+}
+
+.belowCOL {
+    fill: #ED40FF;
+}
+
+.vendor-circle {
+    stroke-width: 6px;
+}
+
+.highschool-line,
+.bachelors-line,
+.graduate-line {
+    stroke-width: 0.6;
+    stroke: red;
+    stroke-linecap: round;
+}
+
+.tooltip-rect {
+    stroke: black;
+    fill: white;
+}
+
+.tooltip-text {
+    font-size: 0.8em;
+}
+
+#business-svg,
+#finance-svg {
+    display: block;
+    margin: auto;
+}
+
+#side-panel {
+    border-right: 0.02em solid grey;
+    min-width: 190px;
+    max-height: 100vh;
+    overflow-y: scroll;
+}
+
+#graphs {
+    max-height: 100vh;
+    overflow-y: scroll;
+}
+
+.black {
+    stroke: black;
+    stroke-width: 0.1em;
+}
+
+.business-expense-stroke {
+    stroke: #FFDBDB;
+}
+
+.business-revenue-stroke {
+    stroke: #D8E6CC;
+}
+
+.graph-title {
+    font-size: 0.9em;
+    font-weight: 500;
+}
+
+.month-txt {
+    font-size: 0.8em;
+}
+
+.lgd-txt{
+    font-size: 0.65em;
+}
+
+@media screen and (max-width: 760px) {
+    #side-panel {
+        width: 100%;
+        border-right: none;
+    }
+
+    #graphs {
+        width: 100%;
+        
+    }
+}
