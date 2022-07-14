@@ -24,7 +24,7 @@
     fill: white;
 }
 
-.tooltip-text {
+.tooltip-text, .month-txt, .col-txt {
     font-size: 0.8em;
 }
 
@@ -62,10 +62,6 @@
 .graph-title {
     font-size: 0.9em;
     font-weight: 500;
-}
-
-.month-txt {
-    font-size: 0.8em;
 }
 
 .lgd-txt{
