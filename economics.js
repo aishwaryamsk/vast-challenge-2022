@@ -310,19 +310,21 @@ let getToolTipMsg = function (d) {
         if (d.depth == 2) {
             let vendor = businessDetails[currentMonth][d.parent.data.business][d.data.id];
             let vendorId = (d.data.id != -1) ? d.data.id : 'Unknown';
+            let user = (d.parent.data.business == 'Employers') ? 'Employees' : 'Customers';
             return `Vendor ID: ${vendorId} <br>
                     Amount: ${numberWithCommas(Math.round(d.data.amount * 100) / 100)} <br>
-                    Customers: ${vendor.numCustomers.length} <br>
+                    ${user}: ${vendor.numCustomers.length} <br>
                     Transactions: ${numberWithCommas(vendor.numTransactions)}`;
         } else if (d.depth == 1) {
             let totalTransactions = 0;
             let totalCustomers = 0;
+            let user = (d.data.business == 'Employers') ? 'Employees' : 'Customers';
             Object.entries(businessDetails[currentMonth][d.data.business]).forEach(function (d) {
                 totalTransactions += d[1].numTransactions;
                 totalCustomers += d[1].numCustomers.length;
             })
-            return `Amount: ${numberWithCommas(Math.round(d.value * 100) / 100)} <br>
-            Customers: ${totalCustomers} <br>
+            return `Amount: ${numberWithCommas(Math.round(d.value * 100) / 100)} <br> 
+            ${user}: ${totalCustomers} <br>
             Transactions: ${numberWithCommas(totalTransactions)}`;
         }
     }
