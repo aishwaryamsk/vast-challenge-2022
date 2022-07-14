@@ -221,6 +221,8 @@ let numTransGlobalScale;
 let hourlyRateScale;
 let salaryColor = d3.scaleLinear();
 let ageColorScale;
+
+let highlightEmployerId = -1;
 /*
 * isNumTransGlobal
 * true: data is scaled among all businesses
@@ -233,12 +235,16 @@ let toolTipG;
 
 let handleMouseover = function (e, d) {
     if (d.depth == 0) {
-        console.log('here')
         return;
     }
     // get closest parent of this node that matches 'svg'
     let svgId = this.closest("svg").getAttribute('id');
     if (!(svgId == 'finance-svg' || svgId == 'business-svg')) return;
+
+    if (svgId == 'business-svg' && d.depth == 2) {
+        highlightEmployerId = d.data.id;
+        highlightEmployerCircles(d.data.id);
+    }
 
     let tooltip = d3.select(`#${svgId} .tooltip`); //g
 
@@ -285,6 +291,8 @@ let handleMouseleave = function (e, d) {
     d3.selectAll(".tooltip").style("display", "none")
         .style("opacity", 0);
     d3.select(this).classed('black', false);
+    /* if (d.depth == 2)
+        highlightEmployerId = -1; */
 }
 
 let getToolTipMsg = function (d) {
@@ -545,6 +553,9 @@ let updateBusinessGraph = function (data, svg, height, width = getSVGwidth()) {
         }
     });
 
+    if (highlightEmployerId)
+        highlightEmployerCircles(highlightEmployerId);
+
 
     let logScale = d3.scaleLog();
 
@@ -590,7 +601,6 @@ let updateBusinessGraph = function (data, svg, height, width = getSVGwidth()) {
         .append("circle")
         .attr("class", "business-circle")
         .on("mouseover", handleMouseover)
-        .on("click", handleMouseover)
         .on("mouseleave", handleMouseleave)
         .style("fill", 'transparent')
         .attr("stroke", function (d) {
@@ -748,7 +758,46 @@ let updateFinanceGraph = function (data, svg, height, width = getSVGwidth(), mon
     showEducationLines(graduateData, svg, "graduate-line", true);
 }
 
+let highlightEmployerCircles = function (id) {
+    let employerHighlightData = [];
+    let descendants = rootFinanace.descendants();
+    descendants.forEach(function (d) {
+        if (d.depth == 2 && d.parent.data.employerId == id) {
+            employerHighlightData.push(d.parent);
+        }
+    });
 
+    // outer circles marking business revenue/expense
+    let highlightCircles = d3.selectAll(`#finance-svg .employer-highlight`)
+        .selectAll('.employer-circle')
+        .data(employerHighlightData, d => d.data);
+
+    highlightCircles.exit()
+        .transition().duration(duration / 2)
+        .attr("r", 0)
+        .remove();
+
+    highlightCircles
+        .transition().duration(duration / 2)
+        .attr("cx", d => d.x)
+        .attr("cy", d => d.y)
+        .attr("r", d => d.r)
+        .style("fill", 'transparent');
+
+    highlightCircles.enter()
+        .append("circle")
+        .attr("class", "employer-circle")
+        .style("fill", 'transparent')
+        .attr("stroke", function (d) {
+            return '#FF8B8B';
+        })
+        .style("stroke-width", "1px")
+        .attr("cx", d => d.x)
+        .attr("cy", d => d.y)
+        .attr("r", 0)
+        .transition().duration(duration)
+        .attr("r", d => d.r);
+}
 
 let getDomainValues = function (logScale, numColors) {
     //let numColors = colors.length;
