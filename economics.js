@@ -791,7 +791,7 @@ let highlightEmployerCircles = function (id) {
         .attr("stroke", function (d) {
             return '#FF8B8B';
         })
-        .style("stroke-width", "1px")
+        .style("stroke-width", "1.5px")
         .attr("cx", d => d.x)
         .attr("cy", d => d.y)
         .attr("r", 0)
