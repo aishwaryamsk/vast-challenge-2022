@@ -235,10 +235,14 @@ let toolTipG;
 
 let handleMouseClick = function (e, d) {
     let svgId = this.closest("svg").getAttribute('id');
-    if (svgId != 'business-svg') return;
     if (svgId == 'business-svg' && d.depth == 2) {
         highlightEmployerId = d.data.id;
-        highlightEmployerCircles(d.data.id);
+        highlightEmployerCircles(highlightEmployerId);
+    } else if (svgId == 'finance-svg') { // for tracking
+        if (d.depth == 2) {
+            highlightEmployerId = d.parent.data.employerId;
+            highlightEmployerCircles(highlightEmployerId);
+        }
     }
 }
 
@@ -446,7 +450,7 @@ let showHouseholdSize = function (data, svg, className, shape, month) {
         .style("stroke-width", "1.5px")
 
         .on("mouseover", handleMouseover)
-        .on("click", handleMouseover)
+        .on("click", handleMouseClick)
         .on("mouseleave", handleMouseleave);
 }
 
@@ -642,7 +646,7 @@ let updateBusinessGraph = function (data, svg, height, width = getSVGwidth()) {
     vendorCircles.enter()
         .append("circle")
         .attr("class", "vendor-circle")
-        .style("pointer-events","visible")
+        .style("pointer-events", "visible")
         .on("mouseover", handleMouseover)
         .on("click", handleMouseClick)
         .on("mouseleave", handleMouseleave)
