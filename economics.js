@@ -233,6 +233,15 @@ let isNumTransGlobal = true;
 // append the svg object to the body of the page
 let toolTipG;
 
+let handleMouseClick = function (e, d) {
+    let svgId = this.closest("svg").getAttribute('id');
+    if (svgId != 'business-svg') return;
+    if (svgId == 'business-svg' && d.depth == 2) {
+        highlightEmployerId = d.data.id;
+        highlightEmployerCircles(d.data.id);
+    }
+}
+
 let handleMouseover = function (e, d) {
     if (d.depth == 0) {
         return;
@@ -240,11 +249,6 @@ let handleMouseover = function (e, d) {
     // get closest parent of this node that matches 'svg'
     let svgId = this.closest("svg").getAttribute('id');
     if (!(svgId == 'finance-svg' || svgId == 'business-svg')) return;
-
-    if (svgId == 'business-svg' && d.depth == 2) {
-        highlightEmployerId = d.data.id;
-        highlightEmployerCircles(d.data.id);
-    }
 
     let tooltip = d3.select(`#${svgId} .tooltip`); //g
 
@@ -638,8 +642,9 @@ let updateBusinessGraph = function (data, svg, height, width = getSVGwidth()) {
     vendorCircles.enter()
         .append("circle")
         .attr("class", "vendor-circle")
+        .style("pointer-events","visible")
         .on("mouseover", handleMouseover)
-        .on("click", handleMouseover)
+        .on("click", handleMouseClick)
         .on("mouseleave", handleMouseleave)
         .style("fill", function (d) {
             let business = d.parent.data.business;
