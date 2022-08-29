@@ -27,7 +27,7 @@ let timer;
 
 let financeHeight = Math.min(window.innerHeight, window.innerWidth);
 let width;
-let businessHeight = 1.2 * financeHeight;
+let businessHeight = 1.1 * financeHeight;
 let nodeHeirarchyFinance;
 let rootFinanace;
 
