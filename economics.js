@@ -5,8 +5,14 @@ let participants;
 let months;
 let costOfLiving;
 
+let currentMonth = 0;
+let date = new Date(2022, 2, 1); // First month starts at March 2022
+const lastMonth = 14;
 
-// Read from csv
+let financeData = [];
+let businessData = [];
+let businessDetails = [];
+// Read in data from csv
 let Business = {
     Apartments: undefined,
     Employers: undefined,
@@ -15,17 +21,39 @@ let Business = {
     Restaurants: undefined
 };
 
-let currentMonth = 0;
-let date = new Date(2022, 2, 1); // First month starts at March 2022
-const lastMonth = 14;
-
-let businessDetails = [];
-
 let animate = true;
 let ready = false;
 let timer;
 
+let financeHeight = Math.min(window.innerHeight, window.innerWidth);
+let width;
+let businessHeight = 1.2 * financeHeight;
+let nodeHeirarchyFinance;
+let rootFinanace;
 
+let nodeHeirarchyBusiness;
+let rootBusiness;
+
+let squareShape = d3.symbol().type(d3.symbolSquare).size(50);
+let triangleShape = d3.symbol().type(d3.symbolTriangle).size(25);
+let circleShape = d3.symbol().type(d3.symbolCircle).size(50);
+let duration = 0;
+
+let numTransactionsColors = ['#FF8921', '#B17DFF', '#86E195'];
+let numTransBusinessScale = Object.keys(Business).reduce((a, v) => ({ ...a, [v]: {} }), {});
+let numTransGlobalScale;
+let hourlyRateScale;
+let salaryColor = d3.scaleLinear();
+let ageColorScale;
+
+// for tracking employer over time
+let highlightEmployerId = -1;
+/*
+* isNumTransGlobal
+* true: data is scaled among all businesses
+* false: data is scaled for each individual business
+*/
+let isNumTransGlobal = true;
 
 function financeDetailsRow(d) {
     return {
@@ -89,6 +117,68 @@ let readFiles = function () {
     });
 }
 
+readFiles();
+
+Promise.all(filesPromises).then(function (d) {
+    //d[0] to d[14] is activity data: index matches participant id
+    months = d.slice(0, 15);
+    //d[15] is participants info: index matches participant id
+    participants = d[15];
+    //d[16] is jobs info
+    jobs = d[16];
+    //d[17] is cost of living info
+    costOfLiving = d[17];
+
+    // Business transactions for 14 months in order
+    Business.Apartments = d.slice(18, 33);
+    Business.Employers = d.slice(33, 48);
+    Business.Schools = d.slice(48, 63);
+    Business.Pubs = d.slice(63, 78);
+    Business.Restaurants = d.slice(78, 93);
+
+    // Set scales
+    let [min, max] = d3.extent(Object.values(jobs).map(d => d.hourlyRate));
+    salaryColor.domain([min, (min + max) / 2, max]).range(["#FA8072", "gold", "yellowgreen"]);
+
+    ageColorScale = d3.scaleLinear()
+        .domain(d3.extent(participants, d => d.age))
+        .range(['rgb(176,206,231)', 'rgb(20,78,153)']);
+
+    hourlyRateScale = d3.scaleSequential(d3.interpolateGreens)
+        .domain(d3.extent(jobs, d => d.hourlyRate));
+
+    // Extract graph data
+    setFinanceData();
+    setBusinessData();
+
+    // Set legend
+    updateLegend();
+    updateFinanceGraph(getFinanceLegendData(), '#finance-cluster', 50, 50, 0);
+    let schoolData = businessData[0].filter(d => d.business == 'Schools');
+    updateBusinessGraph(schoolData, "#business-cluster", 50, 50);
+
+    // Update the graph every second for each month
+    // (Also, updates the numTransactionsScale on each call as per the monthly transactions)
+    ready = true;
+    animateGraphs();
+
+    /* Initially, num transactions is set to global scale
+    * When user checks the box to see transactions for individual business,
+    * num transactions scale will update when hovered on the business circle
+    * */
+    let attr = {
+        shapes: [circleShape, squareShape, triangleShape],
+        ageRange: ageColorScale.domain(),
+        ageScaleColors: ageColorScale.range(),
+        hourlyRateRange: hourlyRateScale.domain(),
+        hourlyRateColors: hourlyRateScale.range(),
+        numTransGlobalRange: numTransGlobalScale.domain(),
+        numTransGlobalColors: numTransGlobalScale.range()
+    };
+    createLegend(attr);
+});
+
+
 let animateGraphs = function () {
     if (animate && ready) {
         // show once initially
@@ -110,11 +200,6 @@ let animateGraphs = function () {
         }, 1000); //show after delay of 1s
     }
 }
-
-readFiles();
-
-let financeData = [];
-let businessData = [];
 
 let setFinanceData = function () {
     for (let m = 0; m <= lastMonth; m++)
@@ -198,53 +283,6 @@ let packBusiness = d3.pack().padding(function (d) {
     return d.height * 10; // for height 2 (packing between clusters), packing for height 0 (largest outer circle) will be 0
 });
 
-let financeHeight = Math.min(window.innerHeight, window.innerWidth);
-let width;
-let businessHeight = 1.2 * financeHeight;
-let financeSvg;
-let nodeHeirarchyFinance;
-let rootFinanace;
-
-let nodeHeirarchyBusiness;
-let rootBusiness;
-let circlesG;
-let businessTexts;
-
-let squareShape = d3.symbol().type(d3.symbolSquare).size(50);
-let triangleShape = d3.symbol().type(d3.symbolTriangle).size(25);
-let circleShape = d3.symbol().type(d3.symbolCircle).size(50);
-let duration = 0;
-
-let numTransactionsColors = ['#FF8921', '#B17DFF', '#86E195'];
-let numTransBusinessScale = Object.keys(Business).reduce((a, v) => ({ ...a, [v]: {} }), {});
-let numTransGlobalScale;
-let hourlyRateScale;
-let salaryColor = d3.scaleLinear();
-let ageColorScale;
-
-let highlightEmployerId = -1;
-/*
-* isNumTransGlobal
-* true: data is scaled among all businesses
-* false: data is scaled for each individual business
-*/
-let isNumTransGlobal = true;
-
-// append the svg object to the body of the page
-let toolTipG;
-
-let handleMouseClick = function (e, d) {
-    let svgId = this.closest("svg").getAttribute('id');
-    if (svgId == 'business-svg' && d.depth == 2) {
-        highlightEmployerId = d.data.id;
-        highlightEmployerCircles(highlightEmployerId);
-    } else if (svgId == 'finance-svg') { // for tracking
-        if (d.depth == 2) {
-            highlightEmployerId = d.parent.data.employerId;
-            highlightEmployerCircles(highlightEmployerId);
-        }
-    }
-}
 
 let handleMouseover = function (e, d) {
     if (d.depth == 0) {
@@ -299,8 +337,6 @@ let handleMouseleave = function (e, d) {
     d3.selectAll(".tooltip").style("display", "none")
         .style("opacity", 0);
     d3.select(this).classed('black', false);
-    /* if (d.depth == 2)
-        highlightEmployerId = -1; */
 }
 
 let getToolTipMsg = function (d) {
@@ -382,13 +418,6 @@ $(document).ready(function () {
     addToolTip();
 });
 
-let getRotatedWidth = function (r, angle) {
-    return r * Math.cos(angle);
-}
-let getRotatedHeight = function (r, angle) {
-    return r * Math.sin(angle);
-}
-
 let addToolTip = function () {
     let tt = d3.selectAll(".tooltip");
     tt.append('rect')
@@ -448,9 +477,17 @@ let showHouseholdSize = function (data, svg, className, shape, month) {
                 return "1,0.5";
         })
         .style("stroke-width", "1.5px")
-
         .on("mouseover", handleMouseover)
-        .on("click", handleMouseClick)
+        .on("click", function (e, d) {
+            if (d.parent.data.employerId == highlightEmployerId) {
+                highlightEmployerCircle('#finance-svg', '#FF8B8B', -1, highlightEmployerId);
+                highlightEmployerCircle('#business-svg', '#171FFF', -1, highlightEmployerId);
+            } else {
+                highlightEmployerCircle('#finance-svg', '#FF8B8B', d.parent.data.employerId, highlightEmployerId);
+                highlightEmployerCircle('#business-svg', '#171FFF', d.parent.data.employerId, highlightEmployerId);
+            }
+            highlightEmployerId = (highlightEmployerId != d.parent.data.employerId) ? d.parent.data.employerId : -1;
+        })
         .on("mouseleave", handleMouseleave);
 }
 
@@ -466,7 +503,6 @@ let showBelowCOLCircles = function (data, svg, className, angle) {
 
     // update circles
     c.transition().duration(duration)
-        //.attr("cx", d => d.x - getRotatedWidth(d.r, Math.PI / 2))
         .attr("cx", d => d.x - getRotatedWidth(0.9 * d.r, angle))
         .attr("cy", d => d.y - getRotatedHeight(0.9 * d.r, angle))
         .attr("r", function (d) {
@@ -476,9 +512,6 @@ let showBelowCOLCircles = function (data, svg, className, angle) {
 
     // add new circles
     c.enter().append("circle")
-        //.style("fill", d => color(d.parent.data.employerId))
-        //.style("fill", fill)
-        //.attr("stroke", d => color(d.parent.data.employerId))
         .attr("class", className)
         .attr("cx", d => d.x - getRotatedWidth(0.9 * d.r, angle))
         .attr("cy", d => d.y - getRotatedHeight(0.9 * d.r, angle))
@@ -527,6 +560,45 @@ let showEducationLines = function (data, svg, className, top) {
         });
 }
 
+let drawEmployerCircles = function (data, svg, className) {
+    let c = d3.selectAll(`${svg} .employer-circles`)
+        .selectAll(`.${className}`)
+        .data(data, d => d.data.employerId);
+    //.data(data, d => d.data);
+
+    c.exit()
+        .transition().duration(duration / 2)
+        .attr("r", 0)
+        .remove();
+
+    c.transition()
+        .attr("cx", d => d.x)
+        .attr("cy", d => d.y)
+        .attr("r", d => d.r);
+
+    c.enter()
+        .append("circle")
+        .attr("id", d => `employer-${d.data.employerId}`)
+        .attr("class", className)
+        .on("click", function (e, d) {
+            if (d.data.employerId == highlightEmployerId) {
+                highlightEmployerCircle('#finance-svg', '#FF8B8B', -1, highlightEmployerId);
+                highlightEmployerCircle('#business-svg', '#171FFF', -1, highlightEmployerId);
+            } else {
+                highlightEmployerCircle('#finance-svg', '#FF8B8B', d.data.employerId, highlightEmployerId);
+                highlightEmployerCircle('#business-svg', '#171FFF', d.data.employerId, highlightEmployerId);
+            }
+            highlightEmployerId = (highlightEmployerId != d.data.employerId) ? d.data.employerId : -1;
+        })
+        .style("fill", 'transparent')
+        .style("stroke-width", "2px")
+        .attr("cx", d => d.x)
+        .attr("cy", d => d.y)
+        .attr("r", 0)
+        .transition().duration(duration)
+        .attr("r", d => d.r);
+}
+
 let updateBusinessGraph = function (data, svg, height, width = getSVGwidth()) {
     nodeHeirarchyBusiness = d3.hierarchy({ children: data })
         .sum(d => d.amount)
@@ -560,10 +632,6 @@ let updateBusinessGraph = function (data, svg, height, width = getSVGwidth()) {
             if (n > numTransBusinessRange[business][1]) numTransBusinessRange[business][1] = n;
         }
     });
-
-    if (highlightEmployerId)
-        highlightEmployerCircles(highlightEmployerId);
-
 
     let logScale = d3.scaleLog();
 
@@ -614,9 +682,7 @@ let updateBusinessGraph = function (data, svg, height, width = getSVGwidth()) {
         .attr("stroke", function (d) {
             return (d.data.business == "Employers") ? "#FFDBDB" : "#D8E6CC";
         })
-
         .style("stroke-width", "2.5px")
-        //vendorCircles
         .attr("cx", d => d.x)
         .attr("cy", d => d.y)
         .attr("r", 0)
@@ -641,14 +707,29 @@ let updateBusinessGraph = function (data, svg, height, width = getSVGwidth()) {
             let business = d.parent.data.business;
             let numTransactions = businessDetails[currentMonth][business][d.data.id].numTransactions;
             return isNumTransGlobal ? numTransGlobalScale(numTransactions) : numTransBusinessScale[business](numTransactions);
-        });
+        })
+        .style("stroke-width", "1.5px");
 
     vendorCircles.enter()
         .append("circle")
+        .attr("id", function (d) {
+            if (d.parent.data.business == 'Employers')
+                return `employer-${d.data.id}`;
+            return d.data.id;
+        })
         .attr("class", "vendor-circle")
         .style("pointer-events", "visible")
         .on("mouseover", handleMouseover)
-        .on("click", handleMouseClick)
+        .on("click", function (e, d) {
+            if (d.data.id == highlightEmployerId) {
+                highlightEmployerCircle('#finance-svg', '#FF8B8B', -1, highlightEmployerId);
+                highlightEmployerCircle('#business-svg', '#171FFF', -1, highlightEmployerId);
+            } else {
+                highlightEmployerCircle('#finance-svg', '#FF8B8B', d.data.id, highlightEmployerId);
+                highlightEmployerCircle('#business-svg', '#171FFF', d.data.id, highlightEmployerId);
+            }
+            highlightEmployerId = (highlightEmployerId != d.data.id) ? d.data.id : -1;
+        })
         .on("mouseleave", handleMouseleave)
         .style("fill", function (d) {
             let business = d.parent.data.business;
@@ -669,8 +750,7 @@ let updateBusinessGraph = function (data, svg, height, width = getSVGwidth()) {
         .transition().duration(duration / 2)
         .remove();
 
-    label
-        .enter().append("text")
+    label.enter().append("text")
         .attr("class", "business-text")
         .attr("transform", function (d) {
             return `translate(${d.x},${d.y - (d.r + 8)})`;
@@ -707,9 +787,9 @@ let updateFinanceGraph = function (data, svg, height, width = getSVGwidth(), mon
 
     let leaves = rootFinanace.leaves(); //1011 leaves, represnting each participant
 
-    let onePersonHousehold = [] // participants
-    let twoPeopleHousehold = [] // participants
-    let threePeopleHousehold = [] // participants
+    let onePersonHousehold = []
+    let twoPeopleHousehold = []
+    let threePeopleHousehold = []
     leaves.forEach(function (d) {
         if (d.depth == 2) {
             if (participants[d.data].householdSize == 1)
@@ -765,61 +845,31 @@ let updateFinanceGraph = function (data, svg, height, width = getSVGwidth(), mon
     showEducationLines(highSchoolData, svg, "highschool-line");
     showEducationLines(bachelorsData, svg, "bachelors-line", false);
     showEducationLines(graduateData, svg, "graduate-line", true);
-}
 
-let highlightEmployerCircles = function (id) {
-    let employerHighlightData = [];
-    let descendants = rootFinanace.descendants();
-    descendants.forEach(function (d) {
-        if (d.depth == 2 && d.parent.data.employerId == id) {
-            employerHighlightData.push(d.parent);
+    let employers = [];
+    rootFinanace.descendants().forEach(function (d) {
+        if (d.depth == 1) {
+            employers.push(d);
         }
     });
+    drawEmployerCircles(employers, svg, "employer-circle");
+}
 
-    // outer circles marking business revenue/expense
-    let highlightCircles = d3.selectAll(`#finance-svg .employer-highlight`)
-        .selectAll('.employer-circle')
-        .data(employerHighlightData, d => d.data);
-
-    highlightCircles.exit()
-        .transition().duration(duration / 2)
-        .attr("r", 0)
-        .remove();
-
-    highlightCircles
-        .transition().duration(duration / 2)
-        .attr("cx", d => d.x)
-        .attr("cy", d => d.y)
-        .attr("r", d => d.r)
-        .style("fill", 'transparent');
-
-    highlightCircles.enter()
-        .append("circle")
-        .attr("class", "employer-circle")
-        .style("fill", 'transparent')
-        .attr("stroke", function (d) {
-            return '#FF8B8B';
-        })
-        .style("stroke-width", "1.5px")
-        .attr("cx", d => d.x)
-        .attr("cy", d => d.y)
-        .attr("r", 0)
-        .transition().duration(duration)
-        .attr("r", d => d.r);
+let highlightEmployerCircle = function (svgId, color, currentEmployerId, highlightedEmployerId) {
+    // erase previously highlighted circle
+    d3.select(`${svgId} #employer-${highlightedEmployerId}`)
+        .attr('stroke', undefined);
+    // highlight current circle
+    d3.select(`${svgId} #employer-${currentEmployerId}`)
+        .attr('stroke', color);
 }
 
 let getDomainValues = function (logScale, numColors) {
-    //let numColors = colors.length;
-    //let diff = range[1] - range[0]
     let rangeLen = 100; // range: [0,100]
-
     let step = rangeLen / (numColors - 1);
-    //let forInversion = d3.range(numColors).map(function (d) { return range[0] + d * step });
     let forInversion = d3.range(numColors).map(function (d) { return d * step });
     let domainValues = forInversion.map(logScale.invert);
-
     return domainValues;
-    //let logColour_scale = d3.scaleLog().domain(domainValues).range(colors);
 }
 
 let getSVGwidth = function () {
@@ -885,8 +935,6 @@ let pausePlayAnimation = function (e) {
 
 let updateLegend = function () {
     let dateFormat = { month: 'short', year: 'numeric' };
-    //console.log(date);
-    //document.getElementById('currentMonth').innerText = `Current Month: ${currentMonth}`;
     let dt = date.toLocaleDateString("en-US", dateFormat)
     document.getElementById('currentMonth').innerText = `Current Month: ${dt}`;
     // show monthly cost of living numbers
@@ -906,66 +954,52 @@ let showIndividualBusinessTrans = function () {
     updateNumTransactions();
 }
 
-
 let getMonthlyCostOfLiving = function (householdSize, month) {
     return costOfLiving[3 * (month + 1) - (4 - householdSize)]['costOfLiving'];
 }
 
-Promise.all(filesPromises).then(function (d) {
-    //d[0] to d[14] is activity data: index matches participant id
-    months = d.slice(0, 15);
-    //d[15] is participants info: index matches participant id
-    participants = d[15];
-    //d[16] is jobs info
-    jobs = d[16];
-    //d[17] is cost of living info
-    costOfLiving = d[17];
+let getRotatedWidth = function (r, angle) {
+    return r * Math.cos(angle);
+}
+let getRotatedHeight = function (r, angle) {
+    return r * Math.sin(angle);
+}
 
-    // Business transactions for 14 months in order
-    Business.Apartments = d.slice(18, 33);
-    Business.Employers = d.slice(33, 48);
-    Business.Schools = d.slice(48, 63);
-    Business.Pubs = d.slice(63, 78);
-    Business.Restaurants = d.slice(78, 93);
+/* UN-USED */
+let showHighlightedEmployerText = function (currentEmployerId) {
+    let descendants = rootFinanace.descendants();
+    let highlightedEmployer = [];
+    descendants.forEach(function (d) {
+        if (d.depth == 1 && d.data.employerId == currentEmployerId) {
+            highlightedEmployer.push(d);
+        }
+    });
+    const label = d3.selectAll(`#finance-svg .employer-highlight`)
+        .selectAll(".cluster-text")
+        .data(highlightedEmployer)
 
-    // Set scales
-    let [min, max] = d3.extent(Object.values(jobs).map(d => d.hourlyRate));
-    salaryColor.domain([min, (min + max) / 2, max]).range(["#FA8072", "gold", "yellowgreen"]);
+    label.exit()
+        .transition().duration(duration / 2)
+        .remove();
 
-    ageColorScale = d3.scaleLinear()
-        .domain(d3.extent(participants, d => d.age))
-        .range(['rgb(176,206,231)', 'rgb(20,78,153)']);
+    label
+        .transition().duration(duration / 2)
+        .attr("transform", function (d) {
+            return `translate(${d.x},${d.y - (0.92 * d.r)})`;
+        })
+        .text(d => d.data.employerId)
 
-    hourlyRateScale = d3.scaleSequential(d3.interpolateGreens)
-        .domain(d3.extent(jobs, d => d.hourlyRate));
-
-    // Extract graph data
-    setFinanceData();
-    setBusinessData();
-
-    // Set legend
-    updateLegend();
-    updateFinanceGraph(getFinanceLegendData(), '#finance-cluster', 50, 50, 0);
-    let schoolData = businessData[0].filter(d => d.business == 'Schools');
-    updateBusinessGraph(schoolData, "#business-cluster", 50, 50);
-
-    // Update the graph every second for each month
-    // (Also, updates the numTransactionsScale on each call as per the monthly transactions)
-    ready = true;
-    animateGraphs();
-
-    /* Initially, num transactions is set to global scale
-    * When user checks the box to see transactions for individual business,
-    * num transactions scale will update when hovered on the business circle
-    * */
-    let attr = {
-        shapes: [circleShape, squareShape, triangleShape],
-        ageRange: ageColorScale.domain(),
-        ageScaleColors: ageColorScale.range(),
-        hourlyRateRange: hourlyRateScale.domain(),
-        hourlyRateColors: hourlyRateScale.range(),
-        numTransGlobalRange: numTransGlobalScale.domain(),
-        numTransGlobalColors: numTransGlobalScale.range()
-    };
-    createLegend(attr);
-});
+    label
+        .enter().append("text")
+        .attr("class", "cluster-text")
+        .attr("transform", function (d) {
+            //return `translate(${d.x},${d.y - (1.1 * d.r)})`;
+            return `translate(${d.x},${d.y - (d.r)})`;
+        })
+        .style("fill-opacity", 1)
+        .text(d => d.data.employerId)
+        .style("font", "0.5em sans-serif")
+        .attr("pointer-events", "none")
+        .attr("text-anchor", "middle")
+        .style("fill", '#696969');
+}
