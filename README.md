@@ -6,4 +6,4 @@ Graphs look at the economic sector of Engagement city at Ohio, USA. The finance 
 
 **Link:** [Vast Challenge](https://aishwaryamsk.github.io/vast-challenge-2022/economics.html)
 
-**Source:** IEEEVIS
+**Source:** IEEE-VIS
